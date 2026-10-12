@@ -248,7 +248,7 @@ module tlp2dllp
       //store packet, because we're shifting the data to fit in
       //the seq number, we'll need to save 2 bytes of this packet
       ST_IDLE: begin
-        if (tlp_axis_tready && skid_axis_tvalid) begin
+        if (tlp_axis_tready && skid_axis_tvalid && retry_available_i) begin
           tlp_dw0  = skid_axis_tdata;
           crc_in_c = '1;
           //handle posted request
@@ -572,8 +572,13 @@ module tlp2dllp
       end
       ST_TLP_LAST: begin
         crc_in_c            = '1;
-        next_transmit_seq_c = next_transmit_seq_r + 1'b1;
-        next_state          = ST_IDLE;
+        // Arm retry only after the complete framed packet reaches its buffer.
+        // PCIe Base 1.1 3.5.2.1, pp.142,146: retain each transmitted TLP.
+        if (m_axis_tvalid && m_axis_tready && m_axis_tlast) begin
+          dllp_valid_o        = '1;
+          next_transmit_seq_c = next_transmit_seq_r + 1'b1;
+          next_state          = ST_IDLE;
+        end
       end
       default: begin
       end

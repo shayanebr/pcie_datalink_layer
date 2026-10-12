@@ -66,7 +66,7 @@ module axis_retry_fifo
 );
 
   localparam int MaxHdrSize = 4;
-  localparam int MaxPktSize = (MAX_PAYLOAD_SIZE >> 2) + MaxHdrSize;
+  localparam int MaxPktSize = (MAX_PAYLOAD_SIZE >> 2) + MaxHdrSize + 2; // sequence + LCRC
 
   //axis packet holder struct
   typedef struct packed {

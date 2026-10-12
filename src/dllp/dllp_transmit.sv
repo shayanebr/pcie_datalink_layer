@@ -142,7 +142,7 @@ module dllp_transmit
       //axis tlp in
       .s_axis_tdata     (m_axis_tlp2dllp_tdata),
       .s_axis_tkeep     (m_axis_tlp2dllp_tkeep),
-      .s_axis_tvalid    (m_axis_tlp2dllp_tvalid),
+      .s_axis_tvalid    (m_axis_tlp2dllp_tvalid && m_axis_tlp2dllp_tready),
       .s_axis_tlast     (m_axis_tlp2dllp_tlast),
       .s_axis_tuser     (m_axis_tlp2dllp_tuser),
       .s_axis_tready    (),

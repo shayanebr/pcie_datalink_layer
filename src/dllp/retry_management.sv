@@ -101,11 +101,14 @@ module retry_management
     end
     if (free_retry_r) begin  //check if incoming acked seq
       for (int i = 0; i < RETRY_TLP_SIZE; i++) begin  //free retry
-        if (ack_seq_mem_r[i] == store_seq_r) begin
+        // Cumulative ACK retires this sequence and all older outstanding TLPs
+        // within the 12-bit window (Base 1.1 3.5.2.1, p.152).
+        if (retrys_r[i] && 12'(store_seq_r - ack_seq_mem_r[i]) < 12'h800) begin
           retrys_c[i] = '0;
         end
       end
-    end else begin
+    end
+    begin
       if (tx_valid_i) begin  //wait for dllp layer to send a tlp
         ack_seq_mem_c[next_retry_index_r] = tx_seq_num_i;
         retrys_c[next_retry_index_r]      = '1;
@@ -115,18 +118,24 @@ module retry_management
             retry_index_flag[i] = 1'b0;
             //select lowest available index checking all indexes before
             //this unrolled loop index
-            for (int j = 1; j < RETRY_TLP_SIZE; j++) begin
+            for (int j = 0; j < RETRY_TLP_SIZE; j++) begin
               if (!retrys_r[j] && (j != next_retry_index_r) && (j < i)) begin
                 retry_index_flag[i] = 1'b1;
               end
             end
             //this check ensures that either the zero index
             //or the lowest index is selected
-            if (!retry_index_flag || i == 0) begin
-              next_retry_index_c = i;
+            if (!retry_index_flag[i]) begin
+              next_retry_index_c = 8'(i);
             end
           end
         end
+      end
+    end
+    // After a full buffer is acknowledged, select a genuinely free bank.
+    if (retrys_r[next_retry_index_r] && !tx_valid_i) begin
+      for (int i = RETRY_TLP_SIZE-1; i >= 0; i--) begin
+        if (!retrys_c[i]) next_retry_index_c = 8'(i);
       end
     end
   end
@@ -137,8 +146,11 @@ module retry_management
     store_seq_c  = store_seq_r;
     //check if tlp is acked or nacked
     if (ack_nack_vld_i && ack_nack_i) begin
-      free_retry_c = '1;
-      store_seq_c  = ack_seq_num_i;
+      // An ACK outside the outstanding window must not retire storage (p.151).
+      for (int i = 0; i < RETRY_TLP_SIZE; i++) begin
+        if (retrys_r[i] && ack_seq_mem_r[i] == ack_seq_num_i) free_retry_c = '1;
+      end
+      if (free_retry_c) store_seq_c = ack_seq_num_i;
     end
   end
 
@@ -235,7 +247,7 @@ module retry_management
 
 
   assign retry_err_o       = (error_r != '0);
-  assign retry_available_o = (retrys_r != '1);
+  assign retry_available_o = !retrys_r[next_retry_index_r];
   assign retry_index_o     = next_retry_index_r;
   assign retry_valid_o     = retry_valid_r;
 
