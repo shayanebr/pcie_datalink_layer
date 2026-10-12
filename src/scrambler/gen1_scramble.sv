@@ -66,7 +66,8 @@ module gen1_scramble
     // Base 1.1 4.2.3: COM reseeds immediately after its own byte.
     // Byte zero is transmitted first; a later COM cannot reset earlier bytes.
     assign temp_lfsr_in[i] = lfsr_out[i];
-    assign lfsr_out[i+1] = Q.scramble_reset[i+1] || Q.skp_os[i] ? '1 : temp_lfsr_out[i];
+    assign lfsr_out[i+1] = Q.scramble_reset[i+1] ? '1 :
+        Q.skp_os[i] ? lfsr_out[i] : temp_lfsr_out[i];
     byte_scramble byte_scramble_inst (
         .disable_scrambling('0),
         .lfsr_q            (temp_lfsr_in[i]),
@@ -223,8 +224,8 @@ module gen1_scramble
                 if (Q.data_k[0][0] && Q.data[0][0+:8] == SKP) is_skp_os = '1;
               end
               
+              D.scramble_reset[byte_idx+1] = '1;
               if (!is_skp_os) begin
-                D.scramble_reset[byte_idx+1] = '1;
                 D.byte_cnt = (pipe_width_i >> 3) - (byte_idx);
                 for (int d_idx = 0; d_idx < 4; d_idx++) begin
                   if (d_idx >= byte_idx) begin
@@ -233,9 +234,7 @@ module gen1_scramble
                   end
                 end
               end else begin
-                D.skp_os[byte_idx] = '1;
                 D.disable_scrambling[byte_idx] = '1;
-                D.lfsr_in = lfsr_out[byte_idx];
               end
               // D.scramble_reset[byte_idx] = '1;
               // D.byte_cnt                 = byte_idx;
@@ -243,7 +242,7 @@ module gen1_scramble
             if (Q.data[1][byte_idx*8+:8] == SKP) begin
               D.skp_os[byte_idx]             = '1;
               D.disable_scrambling[byte_idx] = '1;
-              D.lfsr_in                      = lfsr_out[byte_idx];
+
             end  //special k that is not pad... disable scrambling for now
           else if (Q.data[1][byte_idx*8+:8] == PAD_) begin
             end
