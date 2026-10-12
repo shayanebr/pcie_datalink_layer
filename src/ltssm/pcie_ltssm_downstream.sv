@@ -1737,6 +1737,11 @@ module pcie_ltssm_downstream
                 first_ts1_c ='0;
                 lane_speed_change_bit_c ='0;
               end
+            end else if (ts1_valid_i[lane] || idle_valid_i[lane]) begin
+              // Base 1.1 4.2.6.4.2: restart interrupted receive evidence.
+              ts2_cnt_c = (ts2_cnt >= 8'h8) ? 8'h8 : '0;
+              first_ts1_c = '0;
+              lane_speed_change_bit_c = '0;
             end
           end
 
