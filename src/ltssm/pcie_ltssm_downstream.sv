@@ -1838,6 +1838,9 @@ module pcie_ltssm_downstream
                 ts1_cnt_c = '0;
                 ts2_cnt_c = (ts2_cnt >= 8'h8) ? 8'h8 : '0;
               end
+            end else if (ts1_valid_i[lane]) begin
+              // Base 1.1 4.2.6.3.5.1: TS1 interrupts an incomplete TS2 run.
+              ts2_cnt_c = (ts2_cnt >= 8'h8) ? 8'h8 : '0;
             end
           end
 
