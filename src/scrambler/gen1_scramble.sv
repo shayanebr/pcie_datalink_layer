@@ -259,11 +259,8 @@ module gen1_scramble
           // end
 
           //third stage
-          if (Q.skp_os == '0) begin
-            lfsr_swapped[byte_idx] = ({<<{lfsr_out[byte_idx]}});
-          end else begin
-            lfsr_swapped[byte_idx] = ({<<{Q.lfsr_out[0][byte_idx]}});
-          end
+          // The mask and data must describe this serial word, even at SKP.
+          lfsr_swapped[byte_idx] = ({<<{lfsr_out[byte_idx]}});
 
           D.data[NumPipelines-1][byte_idx*8+:8] = ((Q.disable_scrambling[byte_idx] == '0 || (
           Q.stop_scrambling[byte_idx]))) && !Q.data_k[NumPipelines-2][byte_idx]? 
