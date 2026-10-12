@@ -163,7 +163,12 @@ module pcie_datalink_layer
   logic                               first_tlp_valid;
 
 
-  assign fc_initialized_o = fc2_values_sent;
+  // Retain the existing peer-qualified FC_INIT2 completion event until reset.
+  // Base 1.1 3.3.1, pp.133-134: VC0 TLP traffic must wait for completion.
+  always_ff @(posedge clk_i) begin
+    if (rst_i || soft_reset) fc_initialized_o <= 1'b0;
+    else if (fc2_values_sent) fc_initialized_o <= 1'b1;
+  end
 
   pcie_datalink_init #() pcie_datalink_init_inst (
       .clk_i              (clk_i),
@@ -218,7 +223,7 @@ module pcie_datalink_layer
       .rst_i         (rst_i || soft_reset),
       .s_axis_tdata  (tx_tlp_tdata),
       .s_axis_tkeep  (tx_tlp_tkeep),
-      .s_axis_tvalid (tx_tlp_tvalid),
+      .s_axis_tvalid (tx_tlp_tvalid && fc_initialized_o),
       .s_axis_tlast  (tx_tlp_tlast),
       .s_axis_tuser  (tx_tlp_tuser),
       .s_axis_tready (tx_tlp_tready),
@@ -368,7 +373,7 @@ module pcie_datalink_layer
       .m_axis_tdata (tx_tlp_tdata),
       .m_axis_tkeep (tx_tlp_tkeep),
       .m_axis_tvalid(tx_tlp_tvalid),
-      .m_axis_tready(tx_tlp_tready),
+      .m_axis_tready(tx_tlp_tready && fc_initialized_o),
       .m_axis_tlast (tx_tlp_tlast),
       .m_axis_tid   (),
       .m_axis_tdest (),
