@@ -67,6 +67,10 @@ filesets:
     files:
       - example/gtp_channel.xdc : {file_type : xdc}
 
+  ac701_constraints:
+    files:
+      - example/ac701_gtp_channel.xdc : {file_type : xdc}
+
   cocotb:
     files:
       - verif/sequences/pipe_link_up_seq.py: {file_type : user, copyto : .}
@@ -163,6 +167,15 @@ targets:
     tools:
       vivado:
         part : xc7a200tfbg484-2
+        synth_options: --flatten_hierarchy none
+    toplevel : pcie_top_gtp
+
+  synth_ac701:
+    default_tool : vivado
+    filesets : [rtl,ac701_constraints,xsim_tb,glbl]
+    tools:
+      vivado:
+        part : xc7a200tfbg676-2
         synth_options: --flatten_hierarchy none
     toplevel : pcie_top_gtp
 
