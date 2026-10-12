@@ -309,7 +309,7 @@ module pcie_ltssm_downstream
 
   always_ff @(posedge clk_i) begin : gen_link_number
     if (rst_i) begin
-      link_number_selected <= '0;
+      link_number_selected <= IS_UPSTREAM ? 8'd0 : 8'(LINK_NUM);
       max_rate             <= gen1;
     end else begin
       logic [MAX_NUM_LANES-1:0] flag_lane;
@@ -318,7 +318,7 @@ module pcie_ltssm_downstream
       flag_rate = '0;
       for (int i = 0; i < MAX_NUM_LANES; i++) begin
         if (i == 0) begin
-          if (lane_link_number_selected[i]) begin
+          if (IS_UPSTREAM && lane_link_number_selected[i]) begin
             link_number_selected <= link_number_selected_per_lane[8*i+:8];
           end
 
@@ -327,7 +327,7 @@ module pcie_ltssm_downstream
           end
         end else begin
 
-          if (lane_link_number_selected[i] && ((flag_lane >> i) == '0)) begin
+          if (IS_UPSTREAM && lane_link_number_selected[i] && ((flag_lane >> i) == '0)) begin
             link_number_selected <= link_number_selected_per_lane[8*i+:8];
             flag_lane[i] = '1;
           end
@@ -1735,8 +1735,10 @@ module pcie_ltssm_downstream
               end
 
               
-              //check that link number is not pad and that lane number is pad
+              // Base 1.1 4.2.6.3.1.1: a downstream peer must echo
+              // the locally advertised Link; arbitrary non-PAD is insufficient.
               if ((ordered_set_i[lane].link_num != PAD) &&
+                  (IS_UPSTREAM || ordered_set_i[lane].link_num == link_number_selected) &&
                   (ordered_set_i[lane].lane_num == PAD)) begin
                 //incrment ts1 count
                 ts1_cnt_c = (ts1_cnt >= 8'h2) ? 8'h2 : ts1_cnt + 1;
