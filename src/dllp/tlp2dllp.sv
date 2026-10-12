@@ -139,6 +139,7 @@ module tlp2dllp
   logic                 [          11:0] npd_credit_limit_r;
   logic                 [          11:0] cplh_credit_limit_c;
   logic                 [          11:0] cplh_credit_limit_r;
+  logic fc_limits_initialized_r, cplh_infinite_r, cpld_infinite_r;
 
 
 
@@ -160,6 +161,9 @@ module tlp2dllp
       npd_credit_limit_r      <= '0;
       cpld_credit_limit_r     <= '0;
       cplh_credit_limit_r     <= '0;
+      fc_limits_initialized_r <= 1'b0;
+      cplh_infinite_r <= 1'b0;
+      cpld_infinite_r <= 1'b0;
     end else begin
       curr_state              <= next_state;
       next_transmit_seq_r     <= next_transmit_seq_c;
@@ -175,6 +179,13 @@ module tlp2dllp
       npd_credit_limit_r      <= npd_credit_limit_c;
       cpld_credit_limit_r     <= cpld_credit_limit_c;
       cplh_credit_limit_r     <= cplh_credit_limit_c;
+      // The first complete credit update initializes the limits. Preserve its
+      // infinity indications (Base 1.1 2.6.1/2.6.1.1, pp.109-112).
+      if (update_fc_i && !fc_limits_initialized_r) begin
+        fc_limits_initialized_r <= 1'b1;
+        cplh_infinite_r <= (tx_fc_cplh_i == 8'd0);
+        cpld_infinite_r <= (tx_fc_cpld_i == 12'd0);
+      end
     end
     crc_in_r <= crc_in_c;
   end
@@ -426,7 +437,7 @@ module tlp2dllp
       end
       ST_CHECK_CREDITS_CPLH: begin
         static logic has_cplh_credit;
-        has_cplh_credit = '0;
+        has_cplh_credit = cplh_infinite_r;
         //assign seq number then first 2 bytes of tlp
         tlp_axis_tdata = {
           skid_axis_tdata[15:0], next_transmit_seq_r[7:0], 4'h0, next_transmit_seq_r[11:8]
@@ -438,21 +449,16 @@ module tlp2dllp
         //check that nph credit is available
         if (cplh_credit_limit_r >= cplh_credits_consumed_r) begin
           if ((cplh_credit_limit_r - cplh_credits_consumed_r) >= 1'b1) begin
-            cplh_credits_consumed_c = cplh_credits_consumed_r + 1'b1;
             has_cplh_credit         = '1;
-          end
-          //account for unlimited completion credit limit
-          if (cplh_credit_limit_r == '0 && cplh_credits_consumed_r == '0) begin
-            has_cplh_credit = '1;
           end
         end  //account for wrap around
         else begin
           if ((cplh_credits_consumed_r - cplh_credit_limit_r) >= 1'b1) begin
-            cplh_credits_consumed_c = cplh_credits_consumed_r + 1'b1;
             has_cplh_credit         = '1;
           end
         end
         if (has_cplh_credit) begin
+          cplh_credits_consumed_c = cplh_credits_consumed_r + 1'b1;
           crc_in_c         = crc_out_32;
           tlp_axis_tvalid  = skid_axis_tvalid;
           skid_axis_tready = '1;
@@ -465,8 +471,8 @@ module tlp2dllp
         static logic [15:0] data_length;
         static logic [15:0] data_credits_required;
         tlp_dw0 = skid_axis_tdata;
-        has_cplh_credit = '0;
-        has_cpld_credit = '0;
+        has_cplh_credit = cplh_infinite_r;
+        has_cpld_credit = cpld_infinite_r;
         data_length = {tlp_dw0.byte2.Length1, tlp_dw0.byte3.Length0};
         // Base 1.1 2.6.1 p.108: one data credit per four DW, rounded up.
         data_credits_required = (data_length == 16'd0) ? 16'd256 :
@@ -484,10 +490,6 @@ module tlp2dllp
           if ((cplh_credit_limit_r - cplh_credits_consumed_r) >= 1'b1) begin
             has_cplh_credit = '1;
           end
-          //account for unlimited completion credit limit
-          if (cplh_credit_limit_r == '0 && cplh_credits_consumed_r == '0) begin
-            has_cplh_credit = '1;
-          end
         end  //account for wrap around
         else begin
           if ((cplh_credits_consumed_r - cplh_credit_limit_r) >= 1'b1) begin
@@ -497,10 +499,6 @@ module tlp2dllp
         //check that posted data credit is available
         if (cpld_credit_limit_r >= cpld_credits_consumed_r) begin
           if ((cpld_credit_limit_r - cpld_credits_consumed_r) >= data_credits_required) begin
-            has_cpld_credit = '1;
-          end
-            //account for unlimited completion credit limit
-          if (cpld_credit_limit_r == '0 && cpld_credits_consumed_r == '0) begin
             has_cpld_credit = '1;
           end
         end  //account for wrap around
@@ -604,9 +602,9 @@ module tlp2dllp
       //update ph
       npd_credit_limit_c = tx_fc_npd_i == npd_credit_limit_r ? npd_credit_limit_r : tx_fc_npd_i;
       //update cpld
-      cpld_credit_limit_c  = tx_fc_cpld_i == cpld_credit_limit_r ? cpld_credit_limit_r : tx_fc_cpld_i;
+      if (!cpld_infinite_r) cpld_credit_limit_c  = tx_fc_cpld_i == cpld_credit_limit_r ? cpld_credit_limit_r : tx_fc_cpld_i;
       //update cplh
-      cplh_credit_limit_c = tx_fc_cplh_i == cplh_credit_limit_r ? cplh_credit_limit_r : tx_fc_cplh_i;
+      if (!cplh_infinite_r) cplh_credit_limit_c = tx_fc_cplh_i == cplh_credit_limit_r ? cplh_credit_limit_r : tx_fc_cplh_i;
     end
   end : flow_contol
 
