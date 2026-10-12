@@ -5,11 +5,11 @@ description: pcie link training state machine
 filesets:
   rtl:
     depend:
-      - fusesoc:pcie:ltssm
+      - fusesoc:pcie:phy_core
 
   cocotb:
     files:
-      - pcie_ltssm/tb/test_ltssm_configuration.py : {file_type : user, copyto : .}
+      - test_ltssm_configuration.py : {file_type : user, copyto : .}
 
 targets:
   default:
