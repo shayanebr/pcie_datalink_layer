@@ -89,11 +89,6 @@ module tlp2dllp
   logic                                  skid_axis_tready;
   //flow buffer axis stage1 signals
   logic                 [DATA_WIDTH-1:0] pipeline_axis_tdata;
-  logic                 [KEEP_WIDTH-1:0] pipeline_axis_tkeep;
-  logic                                  pipeline_axis_tvalid;
-  logic                                  pipeline_axis_tlast;
-  logic                 [USER_WIDTH-1:0] pipeline_axis_tuser;
-  logic                                  pipeline_axis_tready;
   //tlp output buffer axis signals
   logic                 [DATA_WIDTH-1:0] tlp_axis_tdata;
   logic                 [KEEP_WIDTH-1:0] tlp_axis_tkeep;
@@ -648,39 +643,13 @@ module tlp2dllp
 
 
 
-  //axis skid buffer
-  axis_register #(
-      .DATA_WIDTH(DATA_WIDTH),
-      .KEEP_ENABLE('1),
-      .KEEP_WIDTH(KEEP_WIDTH),
-      .LAST_ENABLE('1),
-      .ID_ENABLE('0),
-      .ID_WIDTH(1),
-      .DEST_ENABLE('0),
-      .DEST_WIDTH(1),
-      .USER_ENABLE('1),
-      .USER_WIDTH(3),
-      .REG_TYPE(SkidBuffer)
-  ) axis_input_flow_inst (
-      .clk(clk_i),
-      .rst(rst_i),
-      .s_axis_tdata(skid_axis_tdata),
-      .s_axis_tkeep(skid_axis_tkeep),
-      .s_axis_tvalid(skid_axis_tvalid),
-      .s_axis_tready(),
-      .s_axis_tlast(skid_axis_tlast),
-      .s_axis_tuser(skid_axis_tuser),
-      .s_axis_tid('0),
-      .s_axis_tdest('0),
-      .m_axis_tdata(pipeline_axis_tdata),
-      .m_axis_tkeep(pipeline_axis_tkeep),
-      .m_axis_tvalid(pipeline_axis_tvalid),
-      .m_axis_tready(skid_axis_tready),
-      .m_axis_tlast(pipeline_axis_tlast),
-      .m_axis_tuser(pipeline_axis_tuser),
-      .m_axis_tid(),
-      .m_axis_tdest()
-  );
+  // Hold insertion residue only on an accepted source beat; a source bubble
+  // must not overwrite bytes still needed for framing (Base 1.1 3.5.2.1 p.142).
+  always_ff @(posedge clk_i) begin
+    if (rst_i) pipeline_axis_tdata <= '0;
+    else if (skid_axis_tvalid && skid_axis_tready)
+      pipeline_axis_tdata <= skid_axis_tdata;
+  end
 
 
 
