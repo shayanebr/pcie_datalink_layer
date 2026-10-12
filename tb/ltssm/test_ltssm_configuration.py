@@ -65,7 +65,8 @@ class TB:
         self.log = logging.getLogger("cocotb.tb")
         self.log.setLevel(logging.ERROR)
 
-        cocotb.start_soon(Clock(dut.clk_i, 5, units="ns").start())
+        for clk in (dut.clk_i, dut.pipe_rx_usr_clk_i, dut.pipe_tx_usr_clk_i):
+            cocotb.start_soon(Clock(clk, 10, units="ns").start())
         #self.sink = [AxiStreamSink(AxiStreamBus.from_prefix(dut, f"m{k:02d}_axis"), dut.clk_i, dut.rst_i) for k in range(ports)]
         # self.sink = AxiStreamSink(AxiStreamBus.from_prefix(dut, "m_axis"), dut.clk_i, dut.rst_i)
         # self.sink.set_pause_generator(self.cycle_pause())
@@ -153,6 +154,7 @@ async def loopback(dut):
 
 @cocotb.test()
 async def run_test_loopback(dut):
+    """Native loopback smoke only; elapsed time is not proof of LinkUp."""
     tb = TB(dut)
     cur_id = 1
     seq_num = 0x02
@@ -167,12 +169,12 @@ async def run_test_loopback(dut):
     await RisingEdge(dut.clk_i)
     await RisingEdge(dut.clk_i)
     dut.en_i.value = 1
-    dut.num_active_lanes_i.value = 8
+    lanes = len(dut.phy_phystatus)
     phy_status = BinaryValue(0)
     rxstatus = BinaryValue(0)
     
     
-    for i in range(8):
+    for i in range(lanes):
         phy_status = (phy_status << 1) | 0x1
         rxstatus = (rxstatus << 3) | 0b011 
         
@@ -185,9 +187,7 @@ async def run_test_loopback(dut):
     # assert 1 == 0
         
     # dut.phy_phystatus.value = 
-    dut.lane_active_i.value = 0xFF
-    dut.lane_status_i.value = 0xFF
-    dut.phy_rxelecidle.value = 0xFF
+    dut.phy_rxelecidle.value = (1 << lanes) - 1
     
     # dut.directed_speed_change_i.value =
     
