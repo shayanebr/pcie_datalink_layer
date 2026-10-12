@@ -1610,7 +1610,7 @@ module pcie_ltssm_downstream
               if ((ordered_set_i[lane].link_num == PAD) && (ordered_set_i[lane].lane_num == PAD)) begin
                 ts1_cnt_c = (ts1_cnt >= 8'h8) ? 8'h8 : ts1_cnt + 1;
               end else begin
-                ts1_cnt_c <= ts1_cnt >= 8'h8 ? 8'h8 : '0;
+                ts1_cnt_c = ts1_cnt >= 8'h8 ? 8'h8 : '0;
               end
             end else if (ts2_valid_i[lane]) begin
               single_ts2_received_c = '1;
