@@ -1534,7 +1534,11 @@ module pcie_ltssm_downstream
         link_idle_satisfied[lane]        <= (ts1_cnt >= 8'h8);
         ts1_cnt_satisfied[lane]          <= lane_active_r[lane] ? (ts1_cnt == 8'h8) : '1;
         ts2_cnt_satisfied[lane]          <= lane_active_r[lane] ? (ts2_cnt == 8'h8) : '1;
-        at_least_one_ts1_ts2[lane]       <= (ts1_cnt != '0) | (ts2_cnt != '0);
+        // Base 1.1 4.2.6.4.3: RcvrCfg TS2 history is not new Idle
+        // reconfiguration evidence. Clear the pipelined flag on this entry.
+        at_least_one_ts1_ts2[lane] <=
+            ((curr_state == ST_RECOVERY_RCVR_CFG) && (next_state == ST_RECOVERY_IDLE))
+            ? '0 : ((ts1_cnt != '0) | (ts2_cnt != '0));
         //assignments for state exit scenarios
         lanes_ts1_satisfied[lane]        <= receiver_detected_i[lane] ? (ts1_cnt == 8'h8) : '1;
         lanes_ts2_satisfied[lane]        <= receiver_detected_i[lane] ? (ts2_cnt == 8'h8) : '1;
