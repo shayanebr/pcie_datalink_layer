@@ -26,7 +26,7 @@ filesets:
 
   synth:
     files:
-      - src/example/pcie_phy_0.xci:
+      - example/pcie_phy_0.xci:
           file_type: xci
 
   cocotb:
