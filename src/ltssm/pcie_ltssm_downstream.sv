@@ -1715,12 +1715,15 @@ module pcie_ltssm_downstream
             if (ts2_valid_i[lane]) begin
               single_ts2_received_c ='1;
 
-              if ((temp_ts6 == ordered_set_i[lane].ts_s6) &&
+              // Base 1.1 4.2.6.4.2: even the first TS2 must match the Link/Lane.
+              if ((ordered_set_i[lane].link_num == link_number_selected) &&
+                  (ordered_set_i[lane].lane_num == 8'(lane)) &&
+                  ((temp_ts6 == ordered_set_i[lane].ts_s6) &&
                   ((curr_data_rate_r.rate < gen3) ||
                   ((curr_data_rate_r.rate >= gen3) &&
                     ordered_set_i[lane].ts_s6.ts2.req_equal)) &&
                   (temp_rate_id == ordered_set_i[lane].rate_id) ||
-                  !first_ts1) begin
+                  !first_ts1)) begin
                 temp_ts6_c = ordered_set_i[lane].ts_s6;
                 ts2_cnt_c = (ts2_cnt >= 8'h8) ? 8'h8 : ts2_cnt + 1;
                 first_ts1_c ='1;
