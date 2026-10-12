@@ -32,6 +32,8 @@
 # 
 # ==========================================================================
 
+import zlib
+
 from base_uvm import *
 from pcie_base import *
 from cocotbext.pcie.core import RootComplex, MemoryEndpoint, Device
@@ -216,7 +218,8 @@ class pcie_seq(base_sequence):
     def tlp2dllp(self,seq_num, data,tlp_calculator):
         test_data = seq_num.to_bytes(2,'big')
         test_data += data
-        test_data += tlp_calculator.checksum(test_data).to_bytes(4,'big')
+        # PCIe LCRC: reflected CRC32 over sequence and TLP, low byte first.
+        test_data += zlib.crc32(test_data).to_bytes(4, 'little')
         # seq_num += 1
         return test_data
     
