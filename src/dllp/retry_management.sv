@@ -38,6 +38,7 @@ module retry_management
   //maxbytesper tlp
   localparam int MaxTlpHdrSizeDW = 4;
   localparam int RetryTimer = 16'hAA0;
+  localparam int RetryIndexWidth = (RETRY_TLP_SIZE > 1) ? $clog2(RETRY_TLP_SIZE) : 1;
   localparam int MaxBytesPerTLP = MAX_PAYLOAD_SIZE;
   localparam int MaxTlpTotalSizeDW = MaxTlpHdrSizeDW + MaxBytesPerTLP + 1;
 
@@ -137,7 +138,7 @@ module retry_management
       end
     end
     // After a full buffer is acknowledged, select a genuinely free bank.
-    if (retrys_r[next_retry_index_r] && !tx_valid_i) begin
+    if (retrys_r[RetryIndexWidth'(next_retry_index_r)] && !tx_valid_i) begin
       for (int i = RETRY_TLP_SIZE-1; i >= 0; i--) begin
         if (!retrys_c[i]) next_retry_index_c = 8'(i);
       end
@@ -255,7 +256,7 @@ module retry_management
 
 
   assign retry_err_o       = (error_r != '0);
-  assign retry_available_o = !retrys_r[next_retry_index_r];
+  assign retry_available_o = !retrys_r[RetryIndexWidth'(next_retry_index_r)];
   assign retry_index_o     = next_retry_index_r;
   // Bank indices are reused; replay order follows sequence age, not bank index
   // (Base 1.1 3.5.2.1, p.146). Offer only the oldest pending request.

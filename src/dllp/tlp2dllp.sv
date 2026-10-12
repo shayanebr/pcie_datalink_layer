@@ -82,10 +82,10 @@ module tlp2dllp
   logic                 [          11:0] next_transmit_seq_r;
   //skid buffer axis stage1 signals
   logic                 [DATA_WIDTH-1:0] skid_axis_tdata;
-  logic                 [KEEP_WIDTH-1:0] skid_axis_tkeep;
+  logic                 [KEEP_WIDTH-1:0] unused_skid_axis_tkeep;
   logic                                  skid_axis_tvalid;
   logic                                  skid_axis_tlast;
-  logic                 [USER_WIDTH-1:0] skid_axis_tuser;
+  logic                 [           2:0] unused_skid_axis_tuser;
   logic                                  skid_axis_tready;
   //flow buffer axis stage1 signals
   logic                 [DATA_WIDTH-1:0] pipeline_axis_tdata;
@@ -609,6 +609,7 @@ module tlp2dllp
   end : flow_contol
 
 
+  // Sidebands are intentionally discarded after buffering; framing supplies them.
   //axis skid buffer
   axis_register #(
       .DATA_WIDTH(DATA_WIDTH),
@@ -634,11 +635,11 @@ module tlp2dllp
       .s_axis_tid('0),
       .s_axis_tdest('0),
       .m_axis_tdata(skid_axis_tdata),
-      .m_axis_tkeep(skid_axis_tkeep),
+      .m_axis_tkeep(unused_skid_axis_tkeep),
       .m_axis_tvalid(skid_axis_tvalid),
       .m_axis_tready(skid_axis_tready),
       .m_axis_tlast(skid_axis_tlast),
-      .m_axis_tuser(skid_axis_tuser),
+      .m_axis_tuser(unused_skid_axis_tuser),
       .m_axis_tid(),
       .m_axis_tdest()
   );
@@ -655,6 +656,7 @@ module tlp2dllp
 
 
 
+  // Sidebands are intentionally discarded after buffering; framing supplies them.
   //axis skid buffer
   axis_register #(
       .DATA_WIDTH(DATA_WIDTH),
