@@ -1,0 +1,30 @@
+CAPI=2:
+name: fusesoc:pcie:async_fifo_rtl:1.0.0
+description: >
+  The pinned src/async_fifo submodule's own rtl/ sources, as a core without a
+  `provider`. The submodule's own async_fifo.core declares
+  `provider: {name: github, user: dpretet, repo: async_fifo, version: v1.0.0}`,
+  which makes FuseSoC relocate core_root to the downloaded v1.0.0 tarball; that
+  tag ships src/vlog/, not rtl/, so every file in its `rtl` fileset is missing
+  and any build that depends on it stops at
+  "make: *** No rule to make target '.../async_fifo_1.1.0-r1/rtl/async_fifo.v'".
+  This core lists the same ten files from the checked-out submodule instead.
+
+filesets:
+  rtl:
+    files:
+      - async_fifo/rtl/async_bidir_fifo.v
+      - async_fifo/rtl/async_fifo.v
+      - async_fifo/rtl/async_bidir_ramif_fifo.v
+      - async_fifo/rtl/fifomem_dp.v
+      - async_fifo/rtl/fifomem.v
+      - async_fifo/rtl/rptr_empty.v
+      - async_fifo/rtl/sync_ptr.v
+      - async_fifo/rtl/sync_r2w.v
+      - async_fifo/rtl/sync_w2r.v
+      - async_fifo/rtl/wptr_full.v
+    file_type: verilogSource
+
+targets:
+  default:
+    filesets: [rtl]
