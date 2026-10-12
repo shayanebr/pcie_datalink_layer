@@ -481,7 +481,26 @@ module pcie_ltssm_downstream
     tx_enter_elec_idle_o           = '0;
     curr_data_rate_c               = curr_data_rate_r;
     ts2_symbol6                    = '0;
-    link_up_c                      = '0;
+    // Base 1.1 Table 4-4: Recovery retains LinkUp; teardown states clear it.
+    case (curr_state)
+      ST_RECOVERY,
+      ST_RECOVERY_RCVR_LOCK,
+      ST_RECOVERY_RCVR_LOCK_TIMEOUT,
+      ST_RECOVERY_EQUAL,
+      ST_RECOVERY_SPEED,
+      ST_RECOVERY_SPEED_WAIT,
+      ST_RECOVERY_SPEED_EIEOS,
+      ST_RECOVERY_RCVR_CFG,
+      ST_RECOVERY_IDLE,
+      ST_RECOVERY_COMPLETE,
+      ST_RECOVERY_EXT_SYNCH,
+      ST_RECOVERY_SEND_SDS,
+      ST_RECOVERY_EQUAL_PHASE_0,
+      ST_RECOVERY_EQUAL_PHASE_1,
+      ST_RECOVERY_EQUAL_PHASE_2,
+      ST_RECOVERY_EQUAL_PHASE_3: link_up_c = '1;
+      default: link_up_c = '0;
+    endcase
     //ordered set
     ordered_set_c                  = ordered_set_r;
     changed_speed_recovery_c       = changed_speed_recovery_r;
