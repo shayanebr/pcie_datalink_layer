@@ -221,6 +221,7 @@ module pcie_ltssm_downstream
   logic              [     MAX_NUM_LANES-1:0] lane_num_satisfied;
 
   logic              [                  15:0] ordered_set_sent_cnt_c;
+  logic              [                  15:0] polling_post_rx_ts1_count;
   (* mark_debug = "true" *) logic              [                  15:0] ordered_set_sent_cnt_r;
 
   logic              [     MAX_NUM_LANES-1:0] link_lanes_nums_match;
@@ -352,6 +353,7 @@ module pcie_ltssm_downstream
       success_r                      <= '0;
       lane_status_r                  <= '0;
       ordered_set_sent_cnt_r         <= '0;
+      polling_post_rx_ts1_count      <= '0;
       axis_pkt_cnt_r                 <= '0;
       try_cnt_r                      <= '0;
       changed_speed_recovery_r       <= '0;
@@ -395,6 +397,12 @@ module pcie_ltssm_downstream
       success_r                      <= success_c;
       lane_status_r                  <= lane_status_c;
       ordered_set_sent_cnt_r         <= ordered_set_sent_cnt_c;
+      // The 24 ms fallback has a distinct post-first-RX-TS1 minimum.
+      if (curr_state != ST_POLLING_ACTIVE)
+        polling_post_rx_ts1_count <= '0;
+      else if (ordered_set_tranmitted_i && (|single_ts1_received) &&
+               (polling_post_rx_ts1_count < MinTS1sPolling))
+        polling_post_rx_ts1_count <= polling_post_rx_ts1_count + 1'b1;
       axis_pkt_cnt_r                 <= axis_pkt_cnt_c;
       try_cnt_r                      <= try_cnt_c;
       last_data_rate_r               <= last_data_rate_c;
@@ -629,10 +637,10 @@ module pcie_ltssm_downstream
         //check if timer reached or TSOS sent count met
         //check if last packet in frame
         if (ordered_set_tranmitted_i) begin
-          // Only start counting after receiving one TS1
-          if (|single_ts1_received ) begin
-          ordered_set_sent_cnt_c = ordered_set_sent_cnt_r + 1;
-          end
+          // Base 1.1 4.2.6.2.1: the ordinary exit counts all local TS1s,
+          // including those sent before any receive evidence or to a TS2 peer.
+          if (ordered_set_sent_cnt_r < MinTS1sPolling)
+            ordered_set_sent_cnt_c = ordered_set_sent_cnt_r + 1'b1;
           if (|polarity_inverted_i && (polarity_lockout_timer_r == 0)) begin
             phy_rxpolarity_c = phy_rxpolarity_r ^ polarity_inverted_i;
             polarity_lockout_timer_c = 16'd1000; // ~10us lockout
@@ -651,7 +659,7 @@ module pcie_ltssm_downstream
                 next_state = ST_POLLING_CONFIGURATION;
               end
           end
-          if ((timer_r >= TwentyFourMsTimeOut) && (ordered_set_sent_cnt_r >= MinTS1sPolling)) begin
+          if ((timer_r >= TwentyFourMsTimeOut) && (polling_post_rx_ts1_count >= MinTS1sPolling)) begin
             //reset counts
             // timer_c                = '0;
             ordered_set_sent_cnt_c = '0;
