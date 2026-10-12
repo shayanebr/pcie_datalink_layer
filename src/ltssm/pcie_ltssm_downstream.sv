@@ -947,7 +947,9 @@ module pcie_ltssm_downstream
         success_c = '1;
         transmit_ordered_set         = '1;
         idle_to_rlock_transitioned_c = '0;
-        if (|ts1_valid_i || |ts2_valid_i || (directed_speed_change_i && !changed_speed_recovery_r))
+        // Base 1.1 4.2.6.5: the higher layer can direct Recovery at the current rate.
+        if (recovery_i || |ts1_valid_i || |ts2_valid_i ||
+            (directed_speed_change_i && !changed_speed_recovery_r))
         begin
           gen_os_ctrl_c.gen_ts1 = '1;
           gen_os_ctrl_c.valid = '1;
