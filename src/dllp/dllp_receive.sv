@@ -156,16 +156,12 @@ module dllp_receive
     if (!rst_i) begin
       hwif_in.byte_offset_0C.cache_line_size_register.next = hwif_out.byte_offset_0C.cache_line_size_register.value;
       // Base 1.1 7.5.1.4 p.354 requires Master Latency Timer to remain zero.
-      hwif_in.byte_offset_0C.interrupt_line_register.next = hwif_out.byte_offset_0C.interrupt_line_register.value;
-      hwif_in.byte_offset_0C.interrupt_pin_register.next = hwif_out.byte_offset_0C.interrupt_pin_register.value;
-      hwif_in.base_ddress_register_2.BAR.next = hwif_out.base_ddress_register_2.BAR.value;
-      hwif_in.base_ddress_register_3.BAR.next = hwif_out.base_ddress_register_3.BAR.value;
-      hwif_in.base_ddress_register_4.BAR.next = hwif_out.base_ddress_register_4.BAR.value;
-      hwif_in.base_ddress_register_5.BAR.next = hwif_out.base_ddress_register_5.BAR.value;
-      hwif_in.cardbus_cis_pointer.word.next = hwif_out.cardbus_cis_pointer.word.value;
+      // Only fields the specification defines as software-writable are retained:
+      // Cache Line Size (7.5.1.3), Interrupt Line (7.5.1.5) and the lane EQ presets of the
+      // generated map. Header Type, BIST (bytes 0Eh/0Fh, mislabeled interrupt fields in the
+      // map), unimplemented BARs 2-5, the CardBus CIS pointer, Interrupt Pin (7.5.1.6) and
+      // the lane error status keep the delivered hardware-zero tie.
       hwif_in.byte_offset_3C.interrupt_line.next = hwif_out.byte_offset_3C.interrupt_line.value;
-      hwif_in.byte_offset_3C.interrupt_pin.next = hwif_out.byte_offset_3C.interrupt_pin.value;
-      hwif_in.lane_error_status_register.lane_error.next = hwif_out.lane_error_status_register.lane_error.value;
       hwif_in.lane_eq_ctrl_register.downstream_tx_preset.next = hwif_out.lane_eq_ctrl_register.downstream_tx_preset.value;
       hwif_in.lane_eq_ctrl_register.downstream_rx_preset_hint.next = hwif_out.lane_eq_ctrl_register.downstream_rx_preset_hint.value;
       hwif_in.lane_eq_ctrl_register.upstream_tx_preset.next = hwif_out.lane_eq_ctrl_register.upstream_tx_preset.value;
