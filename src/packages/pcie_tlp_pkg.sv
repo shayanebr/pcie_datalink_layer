@@ -220,7 +220,8 @@ package pcie_tlp_pkg;
       //build tlp
       temp_cpl.dw_0.byte0 = Cpl;
       {temp_cpl.dw_0.byte2.Length1, temp_cpl.dw_0.byte3.Length0} = 10'h00;
-      {temp_cpl.dw_1.byte2.byte_count, temp_cpl.dw_1.byte3.byte_count} = 12'h000;
+      // Base 1.1 2.2.9 p.76: non-Memory-Read Completion Byte Count is four.
+      {temp_cpl.dw_1.byte2.byte_count, temp_cpl.dw_1.byte3.byte_count} = 12'h004;
       {temp_cpl.dw_1.byte0.completer_id, temp_cpl.dw_1.byte1.completer_id} = 
       {tlp_hdr_in.word_2.byte_0,tlp_hdr_in.word_2.byte_1};
       temp_cpl.dw_2.byte3.lower_address = 6'h00;
