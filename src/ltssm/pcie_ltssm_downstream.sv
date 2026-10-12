@@ -778,6 +778,8 @@ module pcie_ltssm_downstream
             ordered_set_sent_cnt_c = '0;
             gen_os_ctrl_c.gen_ts1  = '1;
             gen_os_ctrl_c.gen_ts2  = '0;
+            // Base 1.1 4.2.6.3.2.1: assign lanes before the peer's echo.
+            if (!IS_UPSTREAM) gen_os_ctrl_c.set_lane = '1;
             transmit_ordered_set   = '1;
             ordered_set_c = gen_ts_os( gen1, TS1, train_seq_e'(link_number_selected));
             next_state = ST_CONFIGURATION_LANENUM_WAIT;
