@@ -63,14 +63,10 @@ module gen1_scramble
   assign lfsr_out[0] = Q.lfsr_in;
 
   for (genvar i = 0; i < 4; i++) begin : gen_byte_scramble
-    int   pipe_idx;
-    logic reset_byte_scrambler;
-    assign pipe_idx = ((pipe_width_i >> 3) - 1) - i;
-    assign reset_byte_scrambler = Q.scramble_reset[pipe_idx] || (
-    (Q.scramble_reset >> (pipe_width_i >> 3) ) != '0);
-
-    assign temp_lfsr_in[i] = reset_byte_scrambler ? '1 : lfsr_out[i];
-    assign lfsr_out[i+1] = reset_byte_scrambler || Q.skp_os[i]? '1 : temp_lfsr_out[i];
+    // Base 1.1 4.2.3: COM reseeds immediately after its own byte.
+    // Byte zero is transmitted first; a later COM cannot reset earlier bytes.
+    assign temp_lfsr_in[i] = lfsr_out[i];
+    assign lfsr_out[i+1] = Q.scramble_reset[i+1] || Q.skp_os[i] ? '1 : temp_lfsr_out[i];
     byte_scramble byte_scramble_inst (
         .disable_scrambling('0),
         .lfsr_q            (temp_lfsr_in[i]),
