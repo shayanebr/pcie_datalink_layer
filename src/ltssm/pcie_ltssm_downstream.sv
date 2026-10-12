@@ -1687,7 +1687,10 @@ module pcie_ltssm_downstream
               single_ts2_received_c ='1;
             end
 
-            if (ts1_valid_i[lane] || ts2_valid_i[lane]) begin
+            // Base 1.1 4.2.6.4.1: count only our configured Link and Lane.
+            if ((ts1_valid_i[lane] || ts2_valid_i[lane]) &&
+                (ordered_set_i[lane].link_num == link_number_selected) &&
+                (ordered_set_i[lane].lane_num == 8'(lane))) begin
 
               if (lane == '0) begin
                 max_rate_per_lane_c =
@@ -1701,6 +1704,8 @@ module pcie_ltssm_downstream
 
               lane_speed_change_bit_c =
                 ordered_set_i[lane].rate_id.speed_change;
+            end else if (ts1_valid_i[lane] || ts2_valid_i[lane] || idle_valid_i[lane]) begin
+              ts1_cnt_c = (ts1_cnt >= 8'h8) ? 8'h8 : '0;
             end
           end
 
