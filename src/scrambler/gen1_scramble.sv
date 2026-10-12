@@ -91,6 +91,7 @@ module gen1_scramble
     D                 = Q;
     D.scramble_reset  = '0;
     D.stop_scrambling = '0;
+    D.disable_scrambling = '0;
     D.lfsr_in         = lfsr_out[(pipe_width_i>>3)];
     D.skp_os          = '0;
     D.data_valid[0]   = data_valid_i;
@@ -120,13 +121,6 @@ module gen1_scramble
         end
       end
 
-      if (Q.stop_scrambling != '0) begin
-        D.disable_scrambling = '0;
-      end else if (Q.disable_scrambling != '0) begin
-        D.byte_cnt = Q.byte_cnt + (pipe_width_i >> 3);
-        D.disable_scrambling = '1;
-      end
-
       //for each byte
       for (int byte_idx = 0; byte_idx < 4; byte_idx++) begin
         int pipe_idx;
@@ -134,128 +128,23 @@ module gen1_scramble
         lfsr_swapped[byte_idx] = '0;
 
         if (byte_idx < (pipe_width_i >> 3)) begin
-          //---------------------------------------------------------------------
-          //first stage...
-
-
-          //handle case where lfsr out is reset needs to be reset at next
-          // if ((Q.scramble_reset[byte_idx+1]) && (byte_idx == (pipe_width_i >> 3) - 1)) begin
-          //   D.lfsr_in = '1;
-          // end
-          if (Q.skp_os[byte_idx] != '0) begin
-            //skip scrambler advance
-            // D.lfsr_out = Q.lfsr_out;
-            // D.lfsr_in  = lfsr_out[byte_idx];
-            if ((Q.data[0][byte_idx*8+:8] != SKP)) begin
-              // D.skp_os   = '0;
-              D.byte_cnt = '0;
-              for (int idx = 0; idx < 4; idx++) begin
-                if (idx >= byte_idx && idx < (pipe_width_i >> 3)) begin
-                  D.disable_scrambling[idx] = '0;
-                  D.stop_scrambling[idx] = '1;
-                end
-              end
-            end
+          // Decode bypass in serial byte order for Q.data[1]. These controls
+          // advance with that word to Q.data[2], where its LFSR mask is used.
+          // Base 1.1 4.2.3/4.2.4.1: COM starts an ordered set; training has
+          // fifteen following characters. Other K symbols end that candidate,
+          // except PAD which is permitted in its Link/Lane fields.
+          if (Q.data_k[1][byte_idx] && Q.data[1][byte_idx*8+:8] == COM) begin
+            D.scramble_reset[byte_idx+1] = '1;
+            D.disable_scrambling[byte_idx] = '1;
+            D.byte_cnt = 32'd15;
+          end else if (Q.data_k[1][byte_idx] && Q.data[1][byte_idx*8+:8] != PAD_) begin
+            D.byte_cnt = '0;
+            if (Q.data[1][byte_idx*8+:8] == SKP)
+              D.skp_os[byte_idx] = '1;
+          end else if (D.byte_cnt != '0) begin
+            D.disable_scrambling[byte_idx] = '1;
+            D.byte_cnt = D.byte_cnt - 1'b1;
           end
-
-          if ((Q.byte_cnt + (byte_idx + 1)) > 32'd16) begin
-            logic flag;
-            flag = '0;
-
-            //check to see if previous special k is flag
-            for (int idx = 0; idx < 4; idx++) begin
-              if (idx < (pipe_width_i >> 3) && (Q.data_k[1][idx] && Q.data[1][idx*8+:8] == COM)) begin
-                flag = '1;
-              end
-            end
-            // D.disable_scrambling[byte_idx] = '0;
-            // D.stop_scrambling              = '1;
-            //check for end of ordered set
-            for (int idx = 0; idx < 4; idx++) begin
-              if (idx >= byte_idx && (idx < (pipe_width_i >> 3)) && (flag == '0)) begin
-                D.byte_cnt = '0;
-                D.disable_scrambling[idx] = '0;
-                D.stop_scrambling[idx] = '1;
-              end
-            end
-          end  //special case where we know that the very next byte is unscrambled
-          // else if ((Q.byte_cnt + (byte_idx + 1)) > 32'd14) begin
-          //   logic flag;
-          //   flag = '0;
-          //   //check to see if previous special k is flag
-          //   for (int idx = 0; idx < 4; idx++) begin
-          //     if (((idx <= byte_idx) && idx < (pipe_width_i >> 3)) &&
-          //     (Q.data_k[0][idx] && Q.data[0][idx*8+:8] == COM)) begin
-          //       flag = '1;
-          //     end
-          //   end
-          //   for (int idx = 0; idx < 4; idx++) begin
-          //     if (idx >= byte_idx && (idx < (pipe_width_i >> 3)) && (flag == '0)) begin
-          //       D.byte_cnt = '0;
-          //       // D.disable_scrambling[idx] = '0;
-          //       D.stop_scrambling[idx] = '1;
-          //     end
-          //   end
-          // end
-
-          //---------------------------------------------------------------------
-          //second stage
-          //check if special symbol
-          if (Q.data_k[1][byte_idx]) begin
-            //default to scrambling on
-            // D.stop_scrambling[idx] = '1;
-            // if (Q.disable_scrambling << (4 - byte_idx) == '0) begin
-            //   //disable this index and all subsequent
-            //   for (int idx = 0; idx < 4; idx++) begin
-            //     if (idx >= byte_idx) begin
-            //       D.disable_scrambling[idx] = '1;
-            //     end
-            //   end
-            // end
-            //check if comma
-            if (Q.data[1][byte_idx*8+:8] == COM) begin
-              logic is_skp_os;
-              is_skp_os = '0;
-              if (byte_idx < (pipe_width_i >> 3) - 1) begin
-                int next_idx;
-                next_idx = (byte_idx == 3) ? 0 : byte_idx + 1;
-                if (Q.data_k[1][next_idx] && Q.data[1][next_idx*8+:8] == SKP) is_skp_os = '1;
-              end else begin
-                if (Q.data_k[0][0] && Q.data[0][0+:8] == SKP) is_skp_os = '1;
-              end
-              
-              D.scramble_reset[byte_idx+1] = '1;
-              if (!is_skp_os) begin
-                D.byte_cnt = (pipe_width_i >> 3) - (byte_idx);
-                for (int d_idx = 0; d_idx < 4; d_idx++) begin
-                  if (d_idx >= byte_idx) begin
-                    D.disable_scrambling[d_idx] = '1;
-                    // D.stop_scrambling[idx]    = '1;
-                  end
-                end
-              end else begin
-                D.disable_scrambling[byte_idx] = '1;
-              end
-              // D.scramble_reset[byte_idx] = '1;
-              // D.byte_cnt                 = byte_idx;
-            end
-            if (Q.data[1][byte_idx*8+:8] == SKP) begin
-              D.skp_os[byte_idx]             = '1;
-              D.disable_scrambling[byte_idx] = '1;
-
-            end  //special k that is not pad... disable scrambling for now
-          else if (Q.data[1][byte_idx*8+:8] == PAD_) begin
-            end
-          end
-
-
-          // if (Q.data_k[2][byte_idx]) begin
-          //   if (Q.data[2][byte_idx*8+:8] == SKP) begin
-          //     D.skp_os[byte_idx] = '1;
-          //     // D.disable_scrambling[byte_idx] = '1;
-          //     // D.lfsr_in                      = lfsr_out[byte_idx];
-          //   end  //special k that is not pad... disable scrambling for now
-          // end
 
           //third stage
           // The mask and data must describe this serial word, even at SKP.
