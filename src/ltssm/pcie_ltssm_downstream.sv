@@ -1630,6 +1630,7 @@ module pcie_ltssm_downstream
                 ts1_cnt_c = (ts1_cnt >= 8'h8) ? 8'h8 : ts1_cnt + 1;
               end else begin
                 ts1_cnt_c = ts1_cnt >= 8'h8 ? 8'h8 : '0;
+                ts2_cnt_c = ts2_cnt >= 8'h8 ? 8'h8 : '0;
               end
             end else if (ts2_valid_i[lane]) begin
               single_ts2_received_c = '1;
@@ -1638,6 +1639,7 @@ module pcie_ltssm_downstream
                 ts2_cnt_c = (ts2_cnt >= 8'h8) ? 8'h8 : ts2_cnt + 1;
               end else begin
                 ts2_cnt_c = ts2_cnt >= 8'h8 ? 8'h8 : '0;
+                ts1_cnt_c = ts1_cnt >= 8'h8 ? 8'h8 : '0;
               end
             end
           end
