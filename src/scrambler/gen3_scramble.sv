@@ -21,6 +21,7 @@ module gen3_scramble
   logic [     23:0] lfsr_c;
   logic [     23:0] lfsr_r;
   logic [     23:0] lfsr_out             [5];
+  logic [     23:0] lfsr_reversed_c;
   logic [      3:0] scramble_reset;
   logic [      3:0] disable_lfsr_advance;
   logic [     31:0] data_out_o_c;
@@ -157,6 +158,7 @@ module gen3_scramble
         // skip_detected[i]  = '0;
         if (i < (pipe_width_i >> 3)) begin
           byte_idx      = ((pipe_width_i >> 3) - 1) - i;
+          lfsr_reversed_c = {<<{lfsr_out[byte_idx]}};
           eieos_mask    = '1;
           eieos_mask[i] = '0;
           //check if special symbol
@@ -179,12 +181,12 @@ module gen3_scramble
             end else begin
               //scramble data
               data_out_o_c[byte_idx <<3 +: 8] = (data_in_i[byte_idx<<3+:8]
-             ^ (24'({<<{lfsr_out[byte_idx]}})));
+             ^ (lfsr_reversed_c));
             end
           end else begin
             //scramble data
             data_out_o_c[byte_idx <<3 +: 8] = (data_in_i[byte_idx<<3+:8]
-           ^ (24'({<<{lfsr_out[byte_idx]}})));
+           ^ (lfsr_reversed_c));
           end
         end
         //update out
