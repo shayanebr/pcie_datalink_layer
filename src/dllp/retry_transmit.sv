@@ -118,7 +118,7 @@ module retry_transmit
     m_axis_tlast     = '0;
     m_axis_tuser     = '0;
     retry_complete_o = '0;
-    retry_ack_c      = retry_ack_r;
+    retry_ack_c      = '0; // pulse for a newly selected replay, never a stale grant
     retry_index_c    = retry_index_r;
     mutex_flag       = '0;
     case (tlp_curr_state)

@@ -60,6 +60,8 @@ module retry_management
   logic [RETRY_TLP_SIZE-1:0]       retry_valid_r;
   logic                            free_retry_c;
   logic                            free_retry_r;
+  logic                            valid_acknak;
+  logic                            nak_pending_c, nak_pending_r;
   logic [RETRY_TLP_SIZE-1:0]       retrys_c;
   logic [RETRY_TLP_SIZE-1:0]       retrys_r;
   logic [RETRY_TLP_SIZE-1:0]       retry_index_flag;
@@ -77,8 +79,9 @@ module retry_management
       error_r            <= '0;
       next_retry_index_r <= '0;
       retry_valid_r      <= '0;
-      store_seq_r        <= '0;
+      store_seq_r        <= '1;
       free_retry_r       <= '0;
+      nak_pending_r      <= '0;
     end else begin
       retrys_r           <= retrys_c;
       error_r            <= error_c;
@@ -86,6 +89,7 @@ module retry_management
       retry_valid_r      <= retry_valid_c;
       store_seq_r        <= store_seq_c;
       free_retry_r       <= free_retry_c;
+      nak_pending_r      <= nak_pending_c;
     end
     //non-resetable
     ack_seq_mem_r <= ack_seq_mem_c;
@@ -144,13 +148,17 @@ module retry_management
   always_comb begin : retry_free_combo
     free_retry_c = '0;
     store_seq_c  = store_seq_r;
-    //check if tlp is acked or nacked
-    if (ack_nack_vld_i && ack_nack_i) begin
-      // An ACK outside the outstanding window must not retire storage (p.151).
-      for (int i = 0; i < RETRY_TLP_SIZE; i++) begin
-        if (retrys_r[i] && ack_seq_mem_r[i] == ack_seq_num_i) free_retry_c = '1;
-      end
-      if (free_retry_c) store_seq_c = ack_seq_num_i;
+    nak_pending_c = '0;
+    valid_acknak = (ack_seq_num_i == store_seq_r);
+    for (int i = 0; i < RETRY_TLP_SIZE; i++) begin
+      if (retrys_r[i] && ack_seq_mem_r[i] == ack_seq_num_i) valid_acknak = '1;
+    end
+    // Base 1.1 3.5.2.1, pp.151-152: NAK acknowledges through its sequence,
+    // then initiates replay. Delay the request until retirement is visible.
+    if (ack_nack_vld_i && valid_acknak) begin
+      free_retry_c = (ack_seq_num_i != store_seq_r);
+      store_seq_c = ack_seq_num_i;
+      nak_pending_c = !ack_nack_i;
     end
   end
 
@@ -189,12 +197,12 @@ module retry_management
         ST_CNT_RETRY: begin
           //timer counter increment
           retry_timer_c = retry_timer_r + 1'b1;
-          if (!retrys_r[i]) begin  //check if tlp acked
+          if (!retrys_c[i]) begin  //check if tlp acked
             replay_cnt_c  = '0;
             retry_timer_c = '0;
             next_state    = ST_RETRY_IDLE;
           end  //check if timeout reached
-          else if (retry_timer_r >= RetryTimer) begin
+          else if (nak_pending_r || retry_timer_r >= RetryTimer) begin
             replay_cnt_c  = replay_cnt_r + 1'b1;
             retry_timer_c = '0;
             if (replay_cnt_r == '1) begin
@@ -208,7 +216,7 @@ module retry_management
         end
         ST_REPLAY: begin
           //check if late ack
-          if (!retrys_r[i]) begin
+          if (!retrys_c[i]) begin
             replay_cnt_c     = '0;
             retry_timer_c    = '0;
             retry_valid_c[i] = '0;
@@ -224,7 +232,7 @@ module retry_management
         end
         ST_WAIT_REPLAY: begin
           //wait for an ack..
-          if (!retrys_r[i]) begin
+          if (!retrys_c[i]) begin
             replay_cnt_c  = '0;
             retry_timer_c = '0;
             next_state    = ST_RETRY_IDLE;
@@ -249,6 +257,18 @@ module retry_management
   assign retry_err_o       = (error_r != '0);
   assign retry_available_o = !retrys_r[next_retry_index_r];
   assign retry_index_o     = next_retry_index_r;
-  assign retry_valid_o     = retry_valid_r;
+  // Bank indices are reused; replay order follows sequence age, not bank index
+  // (Base 1.1 3.5.2.1, p.146). Offer only the oldest pending request.
+  always_comb begin
+    retry_valid_o = retry_valid_r & retrys_c;
+    for (int i = 0; i < RETRY_TLP_SIZE; i++) begin
+      for (int j = 0; j < RETRY_TLP_SIZE; j++) begin
+        if (retry_valid_r[j] && retrys_c[j] &&
+            12'(ack_seq_mem_r[i] - ack_seq_mem_r[j]) > 12'd0 &&
+            12'(ack_seq_mem_r[i] - ack_seq_mem_r[j]) < 12'h800)
+          retry_valid_o[i] = '0;
+      end
+    end
+  end
 
 endmodule
