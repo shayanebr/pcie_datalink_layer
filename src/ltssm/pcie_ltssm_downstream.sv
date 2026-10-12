@@ -699,7 +699,7 @@ module pcie_ltssm_downstream
           transmit_ordered_set = '1;
           // Base 1.1 4.2.6.3.1.1: downstream advertises its selected Link.
           ordered_set_c = gen_ts_os( gen1, TS1,
-              IS_UPSTREAM ? PAD : train_seq_e'(LINK_NUM));
+              IS_UPSTREAM ? PAD_ : train_seq_e'(LINK_NUM));
           //goto wait low
           next_state = ST_CONFIGURATION_LINKWIDTH_START;
         end  //check timeout count
