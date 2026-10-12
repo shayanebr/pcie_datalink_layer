@@ -79,6 +79,7 @@ module dllp2tlp
   logic                                  fc_start_r;
   logic                                  tlp_nullified_c;
   logic                                  tlp_nullified_r;
+  logic                                  tlp_duplicate_c, tlp_duplicate_r;
   //transmit sequence logic
   logic                 [          15:0] next_transmit_seq_c;
   logic                 [          15:0] next_transmit_seq_r;
@@ -180,6 +181,7 @@ module dllp2tlp
       cplh_credits_consumed_r <= 0;
       cpld_credits_consumed_r <= 0;
       tlp_nullified_r         <= '0;
+      tlp_duplicate_r         <= '0;
       fc_start_r              <= '0;
     end else begin
       curr_state              <= next_state;
@@ -194,6 +196,7 @@ module dllp2tlp
       cplh_credits_consumed_r <= cplh_credits_consumed_c;
       cpld_credits_consumed_r <= cpld_credits_consumed_c;
       tlp_nullified_r         <= tlp_nullified_c;
+      tlp_duplicate_r         <= tlp_duplicate_c;
       fc_start_r              <= fc_start_c;
     end
     //non resetable
@@ -272,6 +275,7 @@ module dllp2tlp
     dll_packet              = '0;
     tlp_header_offset       = '0;
     tlp_nullified_c         = tlp_nullified_r;
+    tlp_duplicate_c         = tlp_duplicate_r;
     fc_start_c              = '0;
     //tlp axis signals
     tlp_axis_tdata          = '0;
@@ -406,6 +410,7 @@ module dllp2tlp
         // end
       end
       ST_CHECK_CRC: begin
+        tlp_duplicate_c = '0;
         tlp_axis_tdata   = {pipeline_axis_tdata[15:0], pipeline_stg2_axis_tdata[31:16]};
         tlp_axis_tvalid  = '1;
         tlp_axis_tlast   = '1;
@@ -456,6 +461,13 @@ module dllp2tlp
             cpld_credits_consumed_c = cpld_credits_consumed_r +
           (word_count_r >> 2 == '0 ? 1'b1 : word_count_r >> 2);
           end
+        end else if ((lcrc32d32 == crc_from_tlp_r) &&
+                     12'(next_expected_seq_num_r - next_transmit_seq_r) > 12'd0 &&
+                     12'(next_expected_seq_num_r - next_transmit_seq_r) <= 12'h800) begin
+          // Base 1.1 3.5.3.1 p.154: discard a valid duplicate, schedule ACK.
+          tlp_axis_tuser  = '1;
+          tlp_nullified_c = '1;
+          tlp_duplicate_c = '1;
         end else begin
           //send nack... retry
           tlp_axis_tuser  = '1;
@@ -655,7 +667,7 @@ module dllp2tlp
   // not the corrupt or out-of-order packet that triggered it.
   assign next_transmit_seq_o    = tlp_nullified_r ?
       {4'b0, next_expected_seq_num_r[11:0] - 12'd1} : next_transmit_seq_r;
-  assign tlp_nullified_o        = tlp_nullified_r;
+  assign tlp_nullified_o        = tlp_nullified_r && !tlp_duplicate_r;
   assign ph_credits_consumed_o  = ph_credits_consumed_r;
   assign pd_credits_consumed_o  = pd_credits_consumed_r;
   assign nph_credits_consumed_o = nph_credits_consumed_r;
