@@ -251,28 +251,11 @@ class pcie_seq(base_sequence):
         # await Timer(2000)
         # self.log.info("dllp transmit %s", repr(pkt))
         if isinstance(pkt,Dllp):
-            seq_item = pkt
-            seq_item.crc = self.calculator.checksum(
-                seq_item.pack()).to_bytes(2, 'big')
-            crc_array = bytearray(seq_item.crc)
-            # print(crc_array)
-            crc_reverse = 0
-            for byte in crc_array:
-                # print(hex(byte))
-                # print(hex((reverse_bits_in_byte(byte)>>1) & 0xff))
-                crc_reverse = (crc_reverse <<8) | ((reverse_bits_in_byte(byte)>>1) & 0xff)
-            # assert 1 == 0
-            data = seq_item.pack()
-            
-            # print(bin(hex(crc_reverse)))
-            # assert 1 == 0
-            # print(crc_reverse.to_bytes(2, 'big'))
-            data += crc_reverse.to_bytes(2, 'big')
-            # print(data)
-            # self.calculator.checksum(data).to_bytes(2, 'big')
-            frame = AxiStreamFrame(data)
+            # Use the peer model's PCIe wire CRC instead of truncating/reversing
+            # each CRC byte; corrupt InitFC packets cannot initialize the DUT.
+            frame = AxiStreamFrame(pkt.pack_crc())
             frame.tuser = 1
-            
+
         elif isinstance(pkt,Tlp):
             seq_item = pkt
             seq_item.crc = self.calculator.checksum(
