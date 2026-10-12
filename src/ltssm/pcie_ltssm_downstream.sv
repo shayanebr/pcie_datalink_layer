@@ -243,6 +243,7 @@ module pcie_ltssm_downstream
 
   // Need to pipeline phy_phystatus_i
   logic              [     MAX_NUM_LANES-1:0] phy_phystatus_r;
+  logic              [     MAX_NUM_LANES-1:0] p0_completed_r, p0_completed_c;
 
 
   logic              [     MAX_NUM_LANES-1:0] phy_rxpolarity_c;
@@ -378,6 +379,7 @@ module pcie_ltssm_downstream
       gen_os_ctrl_r                  <= '0;
       phy_rxelecidle_r               <= '0;
       phy_phystatus_r                <= '0;
+      p0_completed_r                 <= '0;
       // for(i = 0; i < MAX_NUM_LANES; i++) begin
       //   preset_coeff_r.rx_preset <=
       //   tx_preset <=
@@ -386,6 +388,7 @@ module pcie_ltssm_downstream
       // end
     end else begin
       curr_state                     <= next_state;
+      p0_completed_r                 <= p0_completed_c;
       phy_rxelecidle_r               <= phy_rxelecidle_i;
       timer_r                        <= timer_c;
       error_r                        <= error_c;
@@ -453,6 +456,10 @@ module pcie_ltssm_downstream
 
   always_comb begin : ltssm_combo
     next_state                     = curr_state;
+    // PIPE 3.0 6.3/6.8: only a new completion after the P0 request
+    // qualifies; the earlier receiver-detection pulse is not a power ack.
+    p0_completed_c = (curr_state == ST_POLLING) ?
+        p0_completed_r | (phy_phystatus_i & ~phy_phystatus_r) : '0;
     // timer_c                        = timer_r;
     error_c                        = error_r;
     success_c                      = '0;
@@ -598,17 +605,17 @@ module pcie_ltssm_downstream
       // Polling
       //*********************************************************
       ST_POLLING: begin
-        // timer_c                = '0;
-        next_state             = ST_POLLING_ACTIVE;
         ordered_set_sent_cnt_c = '0;
         gen_os_ctrl_c          = '0;
-        // gen_os_ctrl_c.gen_idle = '1;
-        // gen_os_ctrl_c.gen_idle = '1;
-        gen_os_ctrl_c.gen_idle = '0;
-        gen_os_ctrl_c.valid    = '1;
-        gen_os_ctrl_c.gen_ts1  = '1;
-        transmit_ordered_set   = '1;
-        ordered_set_c = gen_ts_os( gen1, TS1);
+        phy_txelecidle_o       = '1;
+        if ((lanes_detected_r != '0) &&
+            ((p0_completed_c & lanes_detected_r) == lanes_detected_r)) begin
+          next_state            = ST_POLLING_ACTIVE;
+          gen_os_ctrl_c.valid    = '1;
+          gen_os_ctrl_c.gen_ts1  = '1;
+          transmit_ordered_set   = '1;
+          ordered_set_c = gen_ts_os( gen1, TS1);
+        end
       end
       //*********************************************************
       // Polling.Active
