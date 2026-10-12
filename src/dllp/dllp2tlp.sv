@@ -436,6 +436,7 @@ module dllp2tlp
         // endcase
         //check crc
         if ((lcrc32d32 == crc_from_tlp_r) && (next_expected_seq_num_r == next_transmit_seq_r)) begin
+          tlp_nullified_c = '0; // a valid in-order retry recovers from rejection
           if (tlp_is_nph_r) begin
             nph_credits_consumed_c = nph_credits_consumed_r + 8'h1;
           end else if (tlp_is_npd_r) begin
@@ -465,7 +466,7 @@ module dllp2tlp
         fc_start_c = '1;
         if (start_flow_control_ack_i) begin
           if (!tlp_nullified_r) begin
-            next_expected_seq_num_c = next_expected_seq_num_r + 32'h1;
+            next_expected_seq_num_c = {4'b0, next_expected_seq_num_r[11:0] + 12'd1};
           end
           tlp_is_nph_c     = '0;
           tlp_is_pd_c      = '0;
@@ -650,7 +651,10 @@ module dllp2tlp
   );
 
   //output assignments
-  assign next_transmit_seq_o    = next_transmit_seq_r;
+  // Base 1.1 3.5.3.1, pp.154-157: NAK names the last accepted sequence,
+  // not the corrupt or out-of-order packet that triggered it.
+  assign next_transmit_seq_o    = tlp_nullified_r ?
+      {4'b0, next_expected_seq_num_r[11:0] - 12'd1} : next_transmit_seq_r;
   assign tlp_nullified_o        = tlp_nullified_r;
   assign ph_credits_consumed_o  = ph_credits_consumed_r;
   assign pd_credits_consumed_o  = pd_credits_consumed_r;
