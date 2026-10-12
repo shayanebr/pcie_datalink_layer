@@ -142,7 +142,8 @@ module pcie_config_handler
   };
   assign s_axil_awaddr = address;
   assign s_axil_wdata = Q.tlp_data[31:0];
-  assign s_axil_wstrb = 4'b1111;
+  // Base 1.1 2.2.5, pp.55-56: disabled bytes must not be written.
+  assign s_axil_wstrb = Q.tlp_hdr.struct_.word_1.first_byte_enable;
   assign s_axil_araddr = address;
 
 

@@ -108,8 +108,8 @@ module pcie_config_decode
   logic                                       skid_axis_tready;
   logic                 [               31:0] tlp_byte_swapped;
   //tlp output axis signals
-  logic                 [     DATA_WIDTH-1:0] tlp_tdata;
-  logic                 [     KEEP_WIDTH-1:0] tlp_strb;
+  logic                 [ TLP_DATA_WIDTH-1:0] tlp_tdata;
+  logic                 [ TLP_STRB_WIDTH-1:0] tlp_strb;
   logic                                       tlp_valid;
   logic                                       tlp_eop;
   logic                 [     USER_WIDTH-1:0] tlp_sop;
@@ -155,6 +155,8 @@ module pcie_config_decode
         if (skid_axis_tvalid && !skid_axis_tlast) begin
           D.tlp_is_3dw             = '0;
           D.tlp_data               = '0;
+          D.word_count             = '0;
+          D.tlp_is_pd              = '0;
           D.tlp_is_sop             = '1;
           tlp_dw0                  = skid_axis_tdata;
           //pcie tlp core is expecting word swapped
@@ -163,7 +165,7 @@ module pcie_config_decode
           if (tlp_dw0.byte0.Fmt inside {TLP_3DW_WD, TLP_3DW_ND}) begin
             D.tlp_is_3dw = '1;
           end
-          if (tlp_dw0.byte0.Fmt inside {TLP_4DW_ND, TLP_4DW_WD}) begin
+          if (tlp_dw0.byte0.Fmt inside {TLP_3DW_WD, TLP_4DW_WD}) begin
             D.tlp_is_pd = '1;
           end
           //state control
@@ -215,13 +217,14 @@ module pcie_config_decode
       end
       ST_TLP_STREAM: begin
         skid_axis_tready = '1;
-        if (s_axis_tvalid) begin
-          D.tlp_data[(3-Q.word_count)*32+:32] = tlp_byte_swapped;
+        if (skid_axis_tvalid) begin
+          // Configuration data retains byte lanes; headers alone are swapped.
+          D.tlp_data[Q.word_count*32+:32] = skid_axis_tdata;
           D.word_count = Q.word_count + 1'b1;
           if (Q.word_count >= 8'd3) begin
             D.state = ST_TLP_SEND;
           end
-          if (s_axis_tlast) begin
+          if (skid_axis_tlast) begin
             D.tlp_is_eop = '1;
             D.state = ST_TLP_SEND;
           end
@@ -229,13 +232,14 @@ module pcie_config_decode
       end
       ST_TLP_SEND: begin
         tlp_valid = '1;
+        tlp_tdata = Q.tlp_data;
+        tlp_strb = TLP_STRB_WIDTH'((1 << Q.word_count) - 1);
+        tlp_eop = Q.tlp_is_eop;
+        tlp_sop = Q.tlp_is_sop;
         if (tlp_ready) begin
-          tlp_tdata    = '0;
-          tlp_strb     = '0;
+          D.word_count = '0;
           D.tlp_is_sop = '0;
           D.tlp_is_eop = '0;
-          tlp_eop      = Q.tlp_is_eop;
-          tlp_sop      = Q.tlp_is_sop;
           D.state      = ST_TLP_STREAM;
           if (Q.tlp_is_eop) begin
             D.tlp_is_eop = '0;
